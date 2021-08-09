@@ -150,16 +150,32 @@ def chose_payment_service(message):
     reply_keyboard = types.ReplyKeyboardMarkup(resize_keyboard=True,
                                                input_field_placeholder='Вибери або введи суму поповнення')
     reply_keyboard.row('30', '50', '120')
+    reply_keyboard.add('Повернутися')
     send = bot.send_message(config.cid, 'Вибери суму оплати рахунку, або введи самомтійно', reply_markup=reply_keyboard)
     bot.register_next_step_handler(send, generate_payment_message)
 
 
 def generate_payment_message(message):
     global payment_amount
-    payment_amount = message.text
+    if message.text == 'Повернутися':
+        command_start(message, 1)
+    else:
+        payment_amount = message.text
 
-    inline_keyboard = types.InlineKeyboardMarkup()
-    inline_keyboard.add()
+        inline_keyboard = types.InlineKeyboardMarkup()
+        pay_url = get_url_from_payment_service(payment_method_variant, payment_amount)
+        pay_text = 'Сплатити ' + payment_amount + ' грн'
+        inline_keyboard.add(types.InlineKeyboardButton(pay_text, url=pay_url))
+        bot.send_message(config.cid, 'Для здійснення оплати перейдіть за посиланням:', reply_markup=inline_keyboard)
+
+
+def get_url_from_payment_service(service, amount):
+    if service == 'Portmone':
+        return 'https://www.portmone.com.ua/gateway/?PAYEE_ID=6813&CONTRACT_NUMBER=3658365&BILL_AMOUNT=' + amount
+    elif service == 'iPay':
+        return 'https://www.ipay.ua/ru/charger?bill_id=591&acc=3658365&invoice=' + amount
+    elif service == 'PrivatBank':
+        return 'https://my-payments.privatbank.ua/mypayments/customauth/identification/fp/static?staticToken=92b2d25e0c3c5e96f03cd5e386b30a43&acc=3658365&amount=' + amount
 
 
 bot.polling()
