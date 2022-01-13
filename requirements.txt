@@ -1,2 +1,2 @@
 pyTelegramBotAPI~4.3.1
-keyboa==3.1.0
+keyboa~3.1.0
