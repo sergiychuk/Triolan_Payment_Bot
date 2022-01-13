@@ -1,4 +1,5 @@
-token = '1775386822:AAElY-QwJK4Z5vR1FtvnLYP_lzhzZIZczo8'
+# token = '5074195246:AAGClhdTA3IMwjkphYCAj_OupzfrXJE1cyE'  # @triolan_payment_bot
+token = '5079445012:AAHfRtAEbsXcmeKK1rGM4mOA8Y4I-6HNZxI'
 debug_mode = False
 cid = 0
 main_url = "https://triolan.name"
