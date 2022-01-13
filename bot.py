@@ -1,181 +1,333 @@
 # -*- coding: utf-8 -*-
+# region ──────────╼[ IMPORT ]╾──────────
 import telebot
-from telebot import types
-import config
+from telebot import *
+from telebot.types import *
 
-bot = telebot.TeleBot(config.token, parse_mode='HTML')
+from Config import *
+from Settings import settings_handler as settings
+from Keyboard import keyboard
+from Data import data as bot_data
+# endregion
 
-isDebug = config.debug_mode
-
-payment_method_variant = ''
-payment_amount = ''
-
-bot_commands = ['start', 'help', 'print_phone', 'print_token', 'print_account', 'print_service_status']
+bot = TeleBot(Token, parse_mode='HTML')
 
 
+# payment_method_variant = ''
+# payment_amount = ''
+#
+# bot_commands = ['start', 'help', 'print_phone', 'print_token', 'print_account', 'print_service_status']
+
+# region ──────────╼[ BOT COMMANDS ]╾──────────
 @bot.message_handler(commands=['start'])
-def command_start(message, t = 0):
-    set_chat_id(message)
+def command_start(message):
+    # link_text = f'<a href="{bot_data.get_payment_link("Portmone", 40)}">inline URL</a>'
+    chat_id = message.from_user.id
+    ResetBot(chat_id)
+    bot.send_message(chat_id=chat_id,
+                     text=GenTextMainMenu(),
+                     disable_web_page_preview=True,
+                     reply_markup=keyboard.main_menu)
 
-    reply_keyboard = types.ReplyKeyboardMarkup(resize_keyboard=True) # , input_field_placeholder='FEZZZ')
-    reply_keyboard.add('Сплатити')
-    reply_keyboard.row( 'Мої рахунки', 'Налаштування')
+@bot.message_handler(commands=['debug_mode'])
+def command_debug_mode(message):
+    chat_id = message.from_user.id
+    settings.debug_mode = not settings.debug_mode
+    out_text = f'<i>Debug Mode: '
+    out_text += f'<b>ON</b></i>' if settings.debug_mode else '<b>OFF</b></i>'
+    bot.send_message(chat_id=chat_id, text=out_text)
 
-    if t == 0:
-        bot.send_message(config.cid, 'Привіти  <b>' + message.from_user.first_name + '</b>!')
-    bot.send_message(config.cid, 'ГОЛОВНЕ МЕНЮ', reply_markup=reply_keyboard)
-
-
-@bot.message_handler(commands=['help'])
-def command_help(message):
-    set_chat_id(message)
-    out_msg_text = 'Команди керування ботом:\n'
-    for command in bot_commands:
-        out_msg_text += '/' + command + '\n'
-    bot.send_message(config.cid, out_msg_text)
-
-
-@bot.message_handler(commands=['print_token'])
-def command_print_token(message):
-    set_chat_id(message)
-    bot.send_message(config.cid, 'Token: <code>' + config.token + '</code>')
-
-
-'''@bot.message_handler(commands=['print_phone'])
-def command_print_phone(message):
-    set_chat_id(message)
-    bot.send_message(config.cid, 'Phone: <b>+' + config.account_phone + '</b>')
+@bot.message_handler(commands=['bot_state'])
+def command_bot_state(message):
+    chat_id = message.from_user.id
+    settings.debug_mode = not settings.debug_mode
+    out_text = f'<i>Bot State: <b>{bot.get_state(chat_id)}</b></i>'
+    bot.send_message(chat_id=chat_id, text=out_text)
+# endregion
 
 
-@bot.message_handler(commands=['print_account'])
-def command_print_account(message):
-    set_chat_id(message)
-    bot.send_message(config.cid, 'Номер особового рахунку: <b>' + str(config.account) + '</b>')
+# region ──────────╼[ BOT FUNCTIONS ]╾──────────
+# region ───[Generate text for main menu]───
+def GenTextMainMenu():
+    text = f'<i>Номер договору:</i> <code>{bot_data.account_id}</code>\n' \
+           f'<i>Платіжна система:</i> <code>{bot_data.payment_service}</code>\n' \
+           f'<i>Кількіть днів:</i> <b><i>{bot_data.payment_days_amount}</i></b>\n' \
+           f'<i>Сума платежу:</i> <b><i>{bot_data.payment_money_amount} грн</i></b>\n'
+    return text
+# endregion
+# region ───[Generate text for changing payment system]───
+def GenTextPaymentSystemMenu():
+    text = f'<i>Обрана платіжна система:</i> <b>{bot_data.payment_service}</b>\n'
+    transfer_fee = round(bot_data.payment_money_amount * 0.2, 1)
+    if bot_data.payment_money_amount > 0:
+        text += f'<code>></code> <i>комісія <b>2%</b> (~<b>{transfer_fee}</b> грн), не менше <b>2</b> грн.</i>'
 
+    return text
+# endregion
+# region ───[Generate text for changing days amount menu]───
+def GenTextChangingDaysAmount():
+    text = f'<i>Збільшення терміну дії послуги на:</i> <i><b><u>{bot_data.payment_days_amount}</u></b> днів.</i>\n'
+    if bot_data.payment_days_amount > 0:
+        text += f'<code>></code> <i>вартість платежу: <b><i>{bot_data.payment_money_amount}</i></b> грн.</i>'
+    return text
+# endregion
+# region ───[Generate text for changing money amount menu]───
+def GenTextChangingMoneyAmount():
+    text = f'<i>Сума платежу:</i> <b><i><u>{bot_data.payment_money_amount}</u> грн</i></b>\n'
+    if bot_data.payment_money_amount > 0:
+        # text += f'<tg-spoiler><code>></code> <i>продовження терміну дії послуги на <b><i><u>{bot_data.payment_days_amount}</u></i></b> днів.</i></tg-spoiler>'
+        text += f'<code>></code> <i>продовження терміну дії послуги на <b><i><u>{bot_data.payment_days_amount}</u></i></b> днів.</i>'
+    return text
+# endregion
+# region ───[Generate text for changing contract id menu]───
+def GenTextChangingContractId():
+    text = f'<i>Номер договору:</i> <b><i><u>{bot_data.account_id}</u>.</i></b>\n'
+    return text
+# endregion
+# region ───[Generate text for generating final payment link menu]───
+def GenTextPaymentLink():
+    text = f'<b><u>Оплата послуги доступу в інтернет:</u></b>\n' \
+           f'<code>></code> <i>номер особового рахунку:</i> <code>{bot_data.account_id}</code>\n' \
+           f'<code>></code> <i>сума платежу:</i> <code>{bot_data.payment_money_amount}</code>\n' \
+           f'<code>></code> <i>продовження терміну дії послуги:</i> <code>{bot_data.payment_days_amount}</code> <i>днів.</i>\n'
+    return text
+# endregion
 
-@bot.message_handler(commands=['print_service_status'])
-def command_print_service_status(message):
-    set_chat_id(message)
-    if config.service_status:
-        bot.send_message(config.cid, 'Статус послуги: <i>увімкнена</i>')
-    else:
-        bot.send_message(config.cid, 'Статус послуги: <i>вимкнена</i>')'''
+# region ───[Reset all bot data]───
+def ResetBot(chat_id):
+    # Reset bot state
+    if bot.get_state(chat_id):
+        bot.delete_state(chat_id)
+# endregion
 
+# endregion
 
-@bot.message_handler(content_types=["text"])
-def text_message_handler(message):
-    set_chat_id(message)
-    msg_txt = message.text
+# region ──────────╼[ CALLBACK HANDLER ]╾──────────
+@bot.callback_query_handler(func=lambda call: True)  # Обработка всех callback событий
+def callback_query_handler(call):
+    # region ──┨ VARIABLES ┠──
+    chat_id = call.message.chat.id  # NOTE: ID чата от которого пришел callback
+    # call_data = call.data[3:]  # NOTE: текст callback.data без "cb_" в начале
+    # call_message = call.message                 # Сообщение от которого пришел callback
+    call_message_id = call.message.message_id  # NOTE: ID сообщения от которого пришел callback
+    # endregion
 
-    if msg_txt == 'Сплатити':
-        reply_keyboard = types.ReplyKeyboardMarkup(resize_keyboard=True,
-                                                   input_field_placeholder='Вибери сервіс оплати')
-        reply_keyboard.row('PrivatBank', 'Portmone', 'iPay')
-        reply_keyboard.add('Повернутися')
+    # region ──┨ IF DEBUG MODE ON ┠──
+    if settings.debug_mode:
+        bot.answer_callback_query(callback_query_id=call.id, text=f'Callback data: {call.data}')
+    # endregion
 
-        out_msg_text = '<b><a href="http://Triolan.net">Triolan.NET</a></b>: ' + str(config.account) + '\n'
-        out_msg_text += get_service_status(config.service_status)
-        out_msg_text += 'Сплачено по: <b>' + config.paid_until + '</b>'
+    # region ──┨ BUTTONS HANDLERS ┠──
+    # region [ Button: Cahnge Days Amount ]
+    if call.data == 'change days_amount':
+        bot.set_state(chat_id, 'set_days_amount')  # Set bot state
+        bot.edit_message_text(text=GenTextChangingDaysAmount(),
+                              chat_id=chat_id,
+                              message_id=call_message_id,
+                              reply_markup=keyboard.days_amount_menu)
+    # endregion
+    # region [ Buttons: Days Amount Changing ]
+    if call.data.split(' ')[0] == 'days_amount':
+        if call.data.split(' ')[1] == 'increase':
+            bot_data.payment_days_amount += 1
+            bot.edit_message_text(text=GenTextChangingDaysAmount(),
+                                  chat_id=chat_id,
+                                  message_id=call_message_id,
+                                  reply_markup=keyboard.days_amount_menu)
 
-        send = bot.send_message(config.cid, out_msg_text, reply_markup=reply_keyboard)
-        bot.register_next_step_handler(send, chose_payment_service)
+        if call.data.split(' ')[1] == 'decrease':
+            if bot_data.payment_days_amount - 1 >= 0:
+                bot_data.payment_days_amount -= 1
+                bot.edit_message_text(text=GenTextChangingDaysAmount(),
+                                      chat_id=chat_id,
+                                      message_id=call_message_id,
+                                      reply_markup=keyboard.days_amount_menu)
+            else:
+                bot_data.payment_days_amount = 0
+                bot.answer_callback_query(callback_query_id=call.id,
+                                          text='Кількість днів може бути цілим додатнім числом!',
+                                          show_alert=True)
+                bot.edit_message_text(text=GenTextChangingDaysAmount(),
+                                      chat_id=chat_id,
+                                      message_id=call_message_id,
+                                      reply_markup=keyboard.days_amount_menu)
 
-    elif msg_txt == 'Повернутися':
-        command_start(message, 1)
+    if call.data.split(' ')[0] == 'set_days_amount':
+        bot_data.payment_days_amount = int(call.data.split(' ')[1])
+        bot.edit_message_text(text=GenTextChangingDaysAmount(),
+                              chat_id=chat_id,
+                              message_id=call_message_id,
+                              reply_markup=keyboard.days_amount_menu)
+    # endregion
 
-    elif msg_txt == 'Мої рахунки':
-        out_msg_text = 'Особові рахунки закріплені за телефоном: <b>' + str(config.account_phone) + '</b>'
-        bot.send_message(config.cid, out_msg_text)
-        out_msg_text = '<b><a href="https://Triolan.net">Triolan.NET</a></b>: ' + str(config.account) + '\n'
-        out_msg_text += 'м.Ровно, Вячеслава Черновола улица, буд.51\n'
-        out_msg_text += 'Сплачено по: ' + config.paid_until + '\n'
-        out_msg_text += get_service_status(config.service_status)
-        bot.send_message(config.cid, out_msg_text)
+    # region [ Buttons: Change Money Amount ]
+    if call.data == 'change money_amount':
+        bot.set_state(chat_id, 'set_money_amount')  # Set bot state
+        bot.edit_message_text(text=GenTextChangingMoneyAmount(),
+                              chat_id=chat_id,
+                              message_id=call_message_id,
+                              reply_markup=keyboard.money_amount_menu)
+    # endregion
+    # region [ Buttons: Money Amount Changing ]
+    if call.data.split(' ')[0] == 'money_amount':
+        if call.data.split(' ')[1] == 'increase':
+            bot_data.payment_money_amount += 4
+            bot.edit_message_text(text=GenTextChangingMoneyAmount(),
+                                  chat_id=chat_id,
+                                  message_id=call_message_id,
+                                  reply_markup=keyboard.money_amount_menu)
+        if call.data.split(' ')[1] == 'decrease':
+            if bot_data.payment_money_amount - 4 >=0:
+                bot_data.payment_money_amount -= 4
+                bot.edit_message_text(text=GenTextChangingMoneyAmount(),
+                                      chat_id=chat_id,
+                                      message_id=call_message_id,
+                                      reply_markup=keyboard.money_amount_menu)
+            else:
+                bot_data.payment_money_amount = 0
+                bot.answer_callback_query(callback_query_id=call.id,
+                                          text='Сума платежу може бути тільки цілим додатнім числом!',
+                                          show_alert=True)
+                bot.edit_message_text(text=GenTextChangingMoneyAmount(),
+                                      chat_id=chat_id,
+                                      message_id=call_message_id,
+                                      reply_markup=keyboard.money_amount_menu)
 
-    elif msg_txt == 'Налаштування':
-        out_msg_text = 'Меню Налаштувань'
-        reply_keyboard = types.ReplyKeyboardMarkup(resize_keyboard=True)
-        reply_keyboard.row('Статус послуги', 'Кінцева дата')
-        reply_keyboard.add('Повернутися')
-        bot.send_message(config.cid, out_msg_text, reply_markup=reply_keyboard)
+    if call.data.split(' ')[0] == 'set_money_amount':
+        bot_data.payment_money_amount = int(call.data.split(' ')[1])
+        bot.edit_message_text(text=GenTextChangingMoneyAmount(),
+                              chat_id=chat_id,
+                              message_id=call_message_id,
+                              reply_markup=keyboard.money_amount_menu)
+    # endregion
 
-    elif msg_txt == 'Статус послуги':
-        reply_keyboard = types.ReplyKeyboardMarkup(resize_keyboard=True,
-                                                   input_field_placeholder='Вибери чи введи статус послуги')
-        reply_keyboard.row('Увімкнути', 'Вимкнути')
-        send = bot.send_message(config.cid, get_service_status(config.service_status), reply_markup=reply_keyboard)
-        bot.register_next_step_handler(send, set_service_status)
+    # region [ Buttons: Change Payment System ]
+    if call.data == 'change payment_system':
+        bot.edit_message_text(text=GenTextPaymentSystemMenu(),
+                              chat_id=chat_id,
+                              message_id=call_message_id,
+                              reply_markup=keyboard.payment_system_menu)
+    # endregion
+    # region [ Buttons: Changing Payment System ]
+    if call.data.split(' ')[0] == 'set_payment_system':
+        bot_data.payment_service = call.data.split(' ')[1]
+        bot.edit_message_text(text=GenTextPaymentSystemMenu(),
+                              chat_id=chat_id,
+                              message_id=call_message_id,
+                              reply_markup=keyboard.payment_system_menu)
+    # endregion
 
-    elif msg_txt == 'Кінцева дата':
-        reply_keyboard = types.ReplyKeyboardMarkup(resize_keyboard=True,
-                                                   input_field_placeholder='Дата дії послуги...')
-        reply_keyboard.add('Повернутися')
-        send = bot.send_message(config.cid, 'Сплачено по: ' + config.paid_until, reply_markup=reply_keyboard)
-        bot.register_next_step_handler(send, set_paid_until_date)
+        # region [ Buttons: Changing Payment System ]
+        if call.data.split(' ')[0] == 'set_payment_system':
+            bot_data.payment_service = call.data.split(' ')[1]
+            bot.edit_message_text(text=GenTextPaymentSystemMenu(),
+                                  chat_id=chat_id,
+                                  message_id=call_message_id,
+                                  reply_markup=keyboard.payment_system_menu)
+        # endregion
+    # endregion
 
+    # region [ Button: Contract ID) ]
+    if call.data.split(' ')[0] == 'change':
+        if call.data.split(' ')[1] == 'contract_id':
+            bot.set_state(chat_id, 'set_contract_id')  # Set bot state
+            bot.edit_message_text(text=GenTextChangingContractId(),
+                                  chat_id=chat_id,
+                                  message_id=call_message_id,
+                                  reply_markup=keyboard.contract_id_menu)
+    # endregion
 
-def set_service_status(message):
-    if message.text == 'Увімкнути':
-        config.set_service_status(True)
-    elif message.text == 'Вимкнути':
-        config.set_service_status(False)
-    bot.send_message(config.cid, get_service_status(config.service_status))
-    command_start(message, 1)
+    # region [ Button: Return to Main Main  ]
+    if call.data.split(' ')[0] == 'return':
+        if call.data.split(' ')[1] == 'main_menu':
+            ResetBot(chat_id)
+            bot.edit_message_text(text=GenTextMainMenu(),
+                                  chat_id=chat_id,
+                                  message_id=call_message_id,
+                                  disable_web_page_preview=True,
+                                  reply_markup=keyboard.main_menu)
+    # endregion
 
+    # region [ Button: Show payment link) ]
+    if call.data.split(' ')[0] == 'show':
+        if call.data.split(' ')[1] == 'payment_link':
+            bot.send_message(chat_id=chat_id,
+                             text=GenTextPaymentLink(),
+                             reply_markup=keyboard.payment_link_menu)
+    # endregion
 
-def set_paid_until_date(message):
-    if message.text != 'Повернутися':
-        config.set_paid_until_date(message.text)
-    command_start(message, 1)
+# endregion
 
+# region ──────────╼[ Handle messages by bot_state and message content_types ]╾──────────
+# region ──────────┨ STATE: set_days_amount ┠──────────
+@bot.message_handler(state="set_days_amount", content_types='text', is_digit=True)
+def get_days_amount(message):
+    chat_id = message.chat.id
+    bot.delete_message(chat_id, message.message_id - 1)  # Delete previous message with changing days amount keyboard
+    bot_data.payment_days_amount = int(message.text)
+    bot.send_message(chat_id, GenTextChangingDaysAmount(), reply_markup=keyboard.days_amount_menu)
 
-def set_chat_id(message):
-    config.cid = message.chat.id
-    if isDebug:
-        print('Chat ID set to: ' + str(config.cid))
+@bot.message_handler(state="set_days_amount", content_types='text', is_digit=False)
+def get_incorrect_days_amount(message):
+    chat_id = message.chat.id
+    bot.delete_message(chat_id, message.message_id - 1)  # Delete previous message with changing days amount keyboard
+    bot.reply_to(message=message,
+                 text='<code>Кількість днів повинно бути цілим додатнім числом!</code>')
+    bot.send_message(chat_id=chat_id,
+                     text=GenTextChangingDaysAmount(),
+                     reply_markup=keyboard.days_amount_menu)
+# endregion
+# region ──────────┨ STATE: set_money_amount ┠──────────
+@bot.message_handler(state="set_money_amount", content_types='text', is_digit=True)
+def get_money_amount(message):
+    chat_id = message.chat.id
+    bot.delete_message(chat_id, message.message_id - 1)  # Delete previous message with changing days amount keyboard
+    bot_data._payment_money_amount = message.text
 
+    bot.send_message(chat_id=chat_id,
+                     text=GenTextChangingMoneyAmount(),
+                     reply_markup=keyboard.money_amount_menu)
 
-def get_service_status(status):
-    msg_text = 'Послуга <b>'
-    if status:
-        msg_text += 'увімкнена</b>\n'
-    else:
-        msg_text += 'вимкнена</b>\n'
-    return msg_text
+@bot.message_handler(state="set_money_amount", content_types='text', is_digit=False)
+def get_incorrect_money_amount(message):
+    chat_id = message.chat.id
+    error_msg = bot.send_message(chat_id=chat_id,
+                     text='<code>Сума платежу повинна бути цілим додатнім числом!</code>',
+                     reply_to_message_id=message.message_id)
+    bot.delete_message(chat_id, message.message_id - 1)  # Delete previous message with changing days amount keyboard
+    bot.send_message(chat_id=chat_id,
+                     text=GenTextChangingMoneyAmount(),
+                     reply_markup=keyboard.money_amount_menu)
+# endregion
+# region ──────────┨ STATE: set_contract_id ┠──────────
+@bot.message_handler(state="set_contract_id", content_types='text', is_digit=True)
+def get_contract_id(message):
+    chat_id = message.chat.id
+    bot.delete_message(chat_id, message.message_id - 1)  # Delete previous message with changing days amount keyboard
 
+    bot_data.account_id = int(message.text)
 
-def chose_payment_service(message):
-    global payment_method_variant
-    payment_method_variant = message.text
-    reply_keyboard = types.ReplyKeyboardMarkup(resize_keyboard=True,
-                                               input_field_placeholder='Вибери або введи суму поповнення')
-    reply_keyboard.row('30', '50', '120')
-    reply_keyboard.add('Повернутися')
-    send = bot.send_message(config.cid, 'Вибери суму оплати рахунку, або введи самомтійно', reply_markup=reply_keyboard)
-    bot.register_next_step_handler(send, generate_payment_message)
+    bot.send_message(chat_id=chat_id,
+                     text=GenTextChangingContractId(),
+                     reply_markup=keyboard.contract_id_menu)
 
+@bot.message_handler(state="set_contract_id", content_types='text', is_digit=False)
+def get_incorrect_contract_id(message):
+    chat_id = message.chat.id
+    bot.send_message(chat_id=chat_id,
+                     text='<code>Номер особового рахунку має бути цілим додатнім числом!</code>',
+                     reply_to_message_id=message.message_id)
+    bot.delete_message(chat_id, message.message_id - 1)  # Delete previous message with changing days amount keyboard
+    bot.send_message(chat_id=chat_id,
+                     text=GenTextChangingContractId(),
+                     reply_markup=keyboard.contract_id_menu)
+# endregion
 
-def generate_payment_message(message):
-    global payment_amount
-    if message.text == 'Повернутися':
-        command_start(message, 1)
-    else:
-        payment_amount = message.text
+# endregion
 
-        inline_keyboard = types.InlineKeyboardMarkup()
-        pay_url = get_url_from_payment_service(payment_method_variant, payment_amount)
-        pay_text = 'Сплатити ' + payment_amount + ' грн'
-        inline_keyboard.add(types.InlineKeyboardButton(pay_text, url=pay_url))
-        bot.send_message(config.cid, 'Для здійснення оплати перейдіть за посиланням:', reply_markup=inline_keyboard)
-
-
-def get_url_from_payment_service(service, amount):
-    if service == 'Portmone':
-        return 'https://www.portmone.com.ua/gateway/?PAYEE_ID=6813&CONTRACT_NUMBER=3658365&BILL_AMOUNT=' + amount
-    elif service == 'iPay':
-        return 'https://www.ipay.ua/ru/charger?bill_id=591&acc=3658365&invoice=' + amount
-    elif service == 'PrivatBank':
-        return 'https://my-payments.privatbank.ua/mypayments/customauth/identification/fp/static?staticToken=92b2d25e0c3c5e96f03cd5e386b30a43&acc=3658365&amount=' + amount
-
-
-bot.polling()
+# region ──────────╼[ BOT GENERAL FUNCTIONS ]╾──────────
+# bot.set_update_listener(update_listener)
+bot.add_custom_filter(custom_filters.StateFilter(bot))  # Добавление кастомных состояний бота
+bot.add_custom_filter(custom_filters.IsDigitFilter())  # Фильтрация текста сообщения по цифре
+bot.infinity_polling(timeout=0, skip_pending=True, long_polling_timeout=0)  # Запуск бота
+# endregion
