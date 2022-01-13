@@ -132,3 +132,7 @@ test.py
 .idea/misc.xml
 .idea/Triolan_Payment_Url_Generator_Bot.iml
 config.py
+.idea/inspectionProfiles/profiles_settings.xml
+.idea/inspectionProfiles/Project_Default.xml
+.idea/modules.xml
+.idea/vcs.xml
