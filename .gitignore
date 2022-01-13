@@ -129,3 +129,6 @@ dmypy.json
 .pyre/
 config.py
 test.py
+.idea/misc.xml
+.idea/Triolan_Payment_Url_Generator_Bot.iml
+config.py
